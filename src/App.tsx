@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { UserPreferences, RecommendationCard, StrategyOutput } from './types';
 import { generateRecommendations, generateStrategyOutput } from './mockData';
 import { PreferenceInput } from './components/PreferenceInput';
@@ -45,6 +45,8 @@ const samplePreferences: UserPreferences = {
 };
 
 export default function App() {
+  const generationRunRef = useRef(0);
+
   // Master User Preferences State
   const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences);
 
@@ -72,9 +74,16 @@ export default function App() {
 
   // Handle CTA on left panel
   const handleGenerate = async (newPrefs: UserPreferences) => {
+    const requestPrefs: UserPreferences = {
+      ...newPrefs,
+      demandText: newPrefs.demandText.trim(),
+    };
+    const runId = generationRunRef.current + 1;
+    generationRunRef.current = runId;
+
     setIsGenerating(true);
     setGenerationSteps('解析输入定位并提取实体...');
-    setPreferences(newPrefs);
+    setPreferences(requestPrefs);
     setCards([]);
     setGeneratedOutputs({});
     setStrategyOutput(null);
@@ -82,13 +91,24 @@ export default function App() {
     setHasGeneratedYet(false);
     setActiveGraphCard(null);
 
+    if (!requestPrefs.demandText) {
+      setGenerationSteps('请先输入应用需求描述');
+      setIsGenerating(false);
+      return;
+    }
+
     try {
       setGenerationSteps('调用 DeepSeek 大模型生成 UI 策略...');
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newPrefs),
+        body: JSON.stringify({
+          ...requestPrefs,
+          generationRunId: runId,
+        }),
       });
+
+      if (generationRunRef.current !== runId) return;
 
       if (!response.ok) {
         throw new Error(`API request failed: ${response.status}`);
@@ -104,22 +124,25 @@ export default function App() {
       const nextSelectedId = data.selectedCardId || nextCards[0]?.id || 'workspace';
       const nextOutputs = data.outputsByCard;
 
-      setPreferences(newPrefs);
+      setPreferences(requestPrefs);
       setCards(nextCards);
       setGeneratedOutputs(nextOutputs);
       setSelectedCardId(nextSelectedId);
       setStrategyOutput(nextOutputs[nextSelectedId] || null);
       setHasGeneratedYet(true);
     } catch (error) {
+      if (generationRunRef.current !== runId) return;
       console.error(error);
       setGenerationSteps('DeepSeek 暂不可用，请稍后重新生成...');
-      setPreferences(newPrefs);
+      setPreferences(requestPrefs);
       setCards([]);
       setGeneratedOutputs({});
       setStrategyOutput(null);
       setHasGeneratedYet(false);
     } finally {
-      setIsGenerating(false);
+      if (generationRunRef.current === runId) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -253,8 +276,7 @@ export default function App() {
         )}
 
         {/* Main Work Surface - Three Columns layout */}
-        {!isGenerating && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
             {/* COLUMN 1: LEFT INPUT PANEL (4 cols) */}
             <section className="lg:col-span-4" aria-label="Preference configurations">
@@ -286,20 +308,30 @@ export default function App() {
                   {!hasGeneratedYet ? (
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center space-y-4" id="empty-state-middle">
                       <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto border border-indigo-100">
-                        <Bookmark className="w-6 h-6 animate-bounce" />
+                        {isGenerating ? (
+                          <RefreshCw className="w-6 h-6 animate-spin" />
+                        ) : (
+                          <Bookmark className="w-6 h-6 animate-bounce" />
+                        )}
                       </div>
                       <div className="space-y-1">
-                        <h4 className="font-bold text-slate-800 text-sm">准备度就绪</h4>
+                        <h4 className="font-bold text-slate-800 text-sm">
+                          {isGenerating ? '正在生成全新方案' : '准备度就绪'}
+                        </h4>
                         <p className="text-xs text-slate-500 leading-normal">
-                          没有配置好的预设需求。请在左侧文本域中写下您的粗糙构想或直接选择我们的“PM 面试训练”模版。
+                          {isGenerating
+                            ? '旧推荐和旧 Prompt 已清空，本次只基于左侧当前输入内容生成。'
+                            : '请在左侧文本域中写下新的产品构想，点击生成后会创建全新的 UI 方案。'}
                         </p>
                       </div>
-                      <button
-                        onClick={handleLoadTemplate}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold cursor-pointer shadow shadow-indigo-100 transition-all inline-block"
-                      >
-                        一键拉取精美演示数据
-                      </button>
+                      {!isGenerating && (
+                        <button
+                          onClick={handleLoadTemplate}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold cursor-pointer shadow shadow-indigo-100 transition-all inline-block"
+                        >
+                          一键拉取精美演示数据
+                        </button>
+                      )}
                     </div>
                   ) : (
                     /* Recommendation Cards list container */
@@ -338,9 +370,13 @@ export default function App() {
                     <Terminal className="w-7 h-7" />
                   </div>
                   <div className="space-y-1.5 max-w-xs">
-                    <h4 className="font-bold text-slate-800 text-sm">生成结果暂空</h4>
+                    <h4 className="font-bold text-slate-800 text-sm">
+                      {isGenerating ? '正在生成交付物' : '生成结果暂空'}
+                    </h4>
                     <p className="text-xs text-slate-400 leading-normal">
-                      当您在左侧确认偏好的受众和定位后，右侧面板将为您自动生成标准的 UI Brief 以及大模型一键导入提示词。
+                      {isGenerating
+                        ? '旧 Brief 和旧 Prompt 已移除，等待本次 DeepSeek 返回新结果。'
+                        : '当您在左侧输入需求并点击生成后，右侧面板将生成标准 UI Brief 以及大模型一键导入提示词。'}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -353,7 +389,6 @@ export default function App() {
             </section>
 
           </div>
-        )}
 
         {/* 6-Role Corporate Data Automation Details Bento Grid */}
         {!isGenerating && (
