@@ -28,17 +28,21 @@ import {
   Bookmark
 } from 'lucide-react';
 
+type GeneratedOutputs = Record<string, StrategyOutput>;
+
+const defaultPreferences: UserPreferences = {
+  demandText: '我想做一个公司内部数据自动化工具完整展开（全岗位提效），覆盖数据分析师、运营、产品、财务、客服、研发，核心解决重复导表、手工 Excel 清洗、多表合并、每日固定报表、脏数据人工修正、指标口径不统一、取数耗时长等公司普遍内耗，分 6 大类，附带落地价值、实现方式、业务场景。',
+  userSegment: '全部岗位',
+  frequency: '高频工作台',
+  styleTone: '专业可信',
+};
+
 export default function App() {
   // Master User Preferences State
-  const [preferences, setPreferences] = useState<UserPreferences>({
-    demandText: '我想做一个公司内部数据自动化工具完整展开（全岗位提效），覆盖数据分析师、运营、产品、财务、客服、研发，核心解决重复导表、手工 Excel 清洗、多表合并、每日固定报表、脏数据人工修正、指标口径不统一、取数耗时长等公司普遍内耗，分 6 大类，附带落地价值、实现方式、业务场景。',
-    userSegment: '全部岗位',
-    frequency: '高频工作台',
-    styleTone: '专业可信',
-  });
+  const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences);
 
   // Recommendation cards state based on preferences
-  const [cards, setCards] = useState<RecommendationCard[]>([]);
+  const [cards, setCards] = useState<RecommendationCard[]>(() => generateRecommendations(defaultPreferences));
   // Active selected recommendation option (Card ID)
   const [selectedCardId, setSelectedCardId] = useState<string>('workspace');
   
@@ -51,47 +55,73 @@ export default function App() {
   const [hasGeneratedYet, setHasGeneratedYet] = useState<boolean>(true); // default true for premium immediate experience
 
   // Core generated outputs container
-  const [strategyOutput, setStrategyOutput] = useState<StrategyOutput | null>(null);
+  const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutputs>(() => ({
+    workspace: generateStrategyOutput('workspace', defaultPreferences),
+    taskflow: generateStrategyOutput('taskflow', defaultPreferences),
+    dashboard: generateStrategyOutput('dashboard', defaultPreferences),
+  }));
+  const [strategyOutput, setStrategyOutput] = useState<StrategyOutput | null>(() => generateStrategyOutput('workspace', defaultPreferences));
 
   // Calculate recommendation options and current active outputs
   useEffect(() => {
-    const recommendedCards = generateRecommendations(preferences);
-    setCards(recommendedCards);
-    
-    // Automatically match output
-    const output = generateStrategyOutput(selectedCardId, preferences);
+    const output = generatedOutputs[selectedCardId] || generateStrategyOutput(selectedCardId, preferences);
     setStrategyOutput(output);
-  }, [preferences, selectedCardId]);
+  }, [generatedOutputs, preferences, selectedCardId]);
 
   // Handle CTA on left panel
-  const handleGenerate = (newPrefs: UserPreferences) => {
+  const handleGenerate = async (newPrefs: UserPreferences) => {
     setIsGenerating(true);
     setGenerationSteps('解析输入定位并提取实体...');
-    
-    // Smooth stepwise transition to mimic high-performance AI reasoning
-    setTimeout(() => {
-      setGenerationSteps('关联底层 280+ UI 知识图谱节点...');
-      setTimeout(() => {
-        setGenerationSteps('量化组件边界与防 Demo 化方案...');
-        setTimeout(() => {
-          setPreferences(newPrefs);
-          setIsGenerating(false);
-          setHasGeneratedYet(true);
-          
-          // Re-evaluate best suited card
-          if (newPrefs.frequency === '一次性生成' || newPrefs.frequency === '偶尔使用工具') {
-            setSelectedCardId('taskflow');
-          } else if (newPrefs.frequency === '长期学习训练') {
-            setSelectedCardId('dashboard');
-          } else {
-            setSelectedCardId('workspace');
-          }
-          
-          // Reset graph if opened
-          setActiveGraphCard(null);
-        }, 300);
-      }, 250);
-    }, 200);
+    setActiveGraphCard(null);
+
+    try {
+      setGenerationSteps('调用 DeepSeek 大模型生成 UI 策略...');
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPrefs),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      setGenerationSteps('校验结构化 Brief / Prompt / Checklist...');
+      const data = await response.json();
+      const nextCards = Array.isArray(data.cards) ? data.cards : generateRecommendations(newPrefs);
+      const nextSelectedId = data.selectedCardId || nextCards[0]?.id || 'workspace';
+      const nextOutputs = data.outputsByCard || {};
+
+      setPreferences(newPrefs);
+      setCards(nextCards);
+      setGeneratedOutputs(nextOutputs);
+      setSelectedCardId(nextSelectedId);
+      setStrategyOutput(nextOutputs[nextSelectedId] || generateStrategyOutput(nextSelectedId, newPrefs));
+      setHasGeneratedYet(true);
+    } catch (error) {
+      console.error(error);
+      setGenerationSteps('DeepSeek 暂不可用，启用本地兜底规则...');
+
+      const fallbackCards = generateRecommendations(newPrefs);
+      const fallbackSelectedId =
+        newPrefs.frequency === '一次性生成' || newPrefs.frequency === '偶尔使用工具'
+          ? 'taskflow'
+          : newPrefs.frequency === '长期学习训练'
+            ? 'dashboard'
+            : 'workspace';
+
+      setPreferences(newPrefs);
+      setCards(fallbackCards);
+      setGeneratedOutputs({
+        workspace: generateStrategyOutput('workspace', newPrefs),
+        taskflow: generateStrategyOutput('taskflow', newPrefs),
+        dashboard: generateStrategyOutput('dashboard', newPrefs),
+      });
+      setSelectedCardId(fallbackSelectedId);
+      setHasGeneratedYet(true);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // Handle resetting the board back to empty initial guide states
@@ -109,11 +139,12 @@ export default function App() {
 
   // Fast starter template loader
   const handleLoadTemplate = () => {
-    setPreferences({
-      demandText: '我想做一个公司内部数据自动化工具完整展开（全岗位提效），覆盖数据分析师、运营、产品、财务、客服、研发，核心解决重复导表、手工 Excel 清洗、多表合并、每日固定报表、脏数据人工修正、指标口径不统一、取数耗时长等公司普遍内耗，分 6 大类，附带落地价值、实现方式、业务场景。',
-      userSegment: '全部岗位',
-      frequency: '高频工作台',
-      styleTone: '专业可信',
+    setPreferences(defaultPreferences);
+    setCards(generateRecommendations(defaultPreferences));
+    setGeneratedOutputs({
+      workspace: generateStrategyOutput('workspace', defaultPreferences),
+      taskflow: generateStrategyOutput('taskflow', defaultPreferences),
+      dashboard: generateStrategyOutput('dashboard', defaultPreferences),
     });
     setSelectedCardId('workspace');
     setHasGeneratedYet(true);
@@ -385,7 +416,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 space-y-1.55">
           <p>© 2026 AI PM UI Copilot. Crafted as a high-performance workspace for elite product managers.</p>
           <p className="text-[11px] text-slate-300">
-            Powered by Tailwind v4, React 19, & Gemini UI styling graph logic nodes. No persistent cloud databases required. State persisted locally.
+            Powered by Tailwind v4, React 19, DeepSeek, and server-side UI strategy generation. No persistent cloud databases required.
           </p>
         </div>
       </footer>
