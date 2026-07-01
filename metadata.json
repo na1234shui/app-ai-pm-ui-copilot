@@ -1,0 +1,6 @@
+{
+  "name": "AI PM UI Copilot",
+  "description": "基于 UI 设计知识图谱的 AI 产品经理界面生成助手，全面支持公司内部全岗位数据自动化与提效中台方案设计，秒级输出高复用 UI Brief 与 Vibe Coding Prompt。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
