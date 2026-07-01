@@ -80,7 +80,7 @@ export default async function handler(req, res) {
 
   const preferences = req.body;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
     const response = await fetch(DEEPSEEK_API_URL, {
@@ -100,7 +100,7 @@ export default async function handler(req, res) {
         ],
         response_format: { type: 'json_object' },
         temperature: 0.7,
-        max_tokens: 4096,
+        max_tokens: 2600,
       }),
       signal: controller.signal,
     });
