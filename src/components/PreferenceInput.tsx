@@ -5,16 +5,15 @@ import { Sparkles, HelpCircle, User, Activity, Palette, Send, Compass, AlertCirc
 interface PreferenceInputProps {
   onGenerate: (prefs: UserPreferences) => void;
   isInitialEmpty: boolean;
+  preferences: UserPreferences;
 }
 
-export const PreferenceInput: React.FC<PreferenceInputProps> = ({ onGenerate, isInitialEmpty }) => {
+export const PreferenceInput: React.FC<PreferenceInputProps> = ({ onGenerate, isInitialEmpty, preferences }) => {
   // Setup default state
-  const [demandText, setDemandText] = useState(
-    '我想做一个公司内部数据自动化工具完整展开（全岗位提效），覆盖数据分析师、运营、产品、财务、客服、研发，核心解决重复导表、手工 Excel 清洗、多表合并、每日固定报表、脏数据人工修正、指标口径不统一、取数耗时长等公司普遍内耗，分 6 大类，附带落地价值、实现方式、业务场景。'
-  );
-  const [userSegment, setUserSegment] = useState('全部岗位');
-  const [frequency, setFrequency] = useState('高频工作台');
-  const [styleTone, setStyleTone] = useState('专业可信');
+  const [demandText, setDemandText] = useState(preferences.demandText);
+  const [userSegment, setUserSegment] = useState(preferences.userSegment);
+  const [frequency, setFrequency] = useState(preferences.frequency);
+  const [styleTone, setStyleTone] = useState(preferences.styleTone);
 
   // Dynamic system questionnaires state based on input
   const [dynamicQuestions, setDynamicQuestions] = useState<Array<{
@@ -27,6 +26,13 @@ export const PreferenceInput: React.FC<PreferenceInputProps> = ({ onGenerate, is
   const userSegments = ['全部岗位', '数据分析师', '运营人员', '产品经理', '财务人员', '客服支持', '研发工程师'];
   const frequencies = ['高频工作台', '偶尔使用工具', '一次性生成', '长期学习训练'];
   const styleTones = ['专业可信', '简洁高效', '温暖易学', '科技智能', '活泼轻量'];
+
+  useEffect(() => {
+    setDemandText(preferences.demandText);
+    setUserSegment(preferences.userSegment);
+    setFrequency(preferences.frequency);
+    setStyleTone(preferences.styleTone);
+  }, [preferences.demandText, preferences.frequency, preferences.styleTone, preferences.userSegment]);
 
   // Update dynamic questionnaires on text change to deepen PM prompts
   useEffect(() => {

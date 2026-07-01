@@ -31,6 +31,13 @@ import {
 type GeneratedOutputs = Record<string, StrategyOutput>;
 
 const defaultPreferences: UserPreferences = {
+  demandText: '',
+  userSegment: '全部岗位',
+  frequency: '偶尔使用工具',
+  styleTone: '专业可信',
+};
+
+const samplePreferences: UserPreferences = {
   demandText: '我想做一个公司内部数据自动化工具完整展开（全岗位提效），覆盖数据分析师、运营、产品、财务、客服、研发，核心解决重复导表、手工 Excel 清洗、多表合并、每日固定报表、脏数据人工修正、指标口径不统一、取数耗时长等公司普遍内耗，分 6 大类，附带落地价值、实现方式、业务场景。',
   userSegment: '全部岗位',
   frequency: '高频工作台',
@@ -42,7 +49,7 @@ export default function App() {
   const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences);
 
   // Recommendation cards state based on preferences
-  const [cards, setCards] = useState<RecommendationCard[]>(() => generateRecommendations(defaultPreferences));
+  const [cards, setCards] = useState<RecommendationCard[]>([]);
   // Active selected recommendation option (Card ID)
   const [selectedCardId, setSelectedCardId] = useState<string>('workspace');
   
@@ -52,26 +59,27 @@ export default function App() {
   // States to represent simulated "AI computing/generation"
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [generationSteps, setGenerationSteps] = useState<string>('就绪');
-  const [hasGeneratedYet, setHasGeneratedYet] = useState<boolean>(true); // default true for premium immediate experience
+  const [hasGeneratedYet, setHasGeneratedYet] = useState<boolean>(false);
 
   // Core generated outputs container
-  const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutputs>(() => ({
-    workspace: generateStrategyOutput('workspace', defaultPreferences),
-    taskflow: generateStrategyOutput('taskflow', defaultPreferences),
-    dashboard: generateStrategyOutput('dashboard', defaultPreferences),
-  }));
-  const [strategyOutput, setStrategyOutput] = useState<StrategyOutput | null>(() => generateStrategyOutput('workspace', defaultPreferences));
+  const [generatedOutputs, setGeneratedOutputs] = useState<GeneratedOutputs>({});
+  const [strategyOutput, setStrategyOutput] = useState<StrategyOutput | null>(null);
 
   // Calculate recommendation options and current active outputs
   useEffect(() => {
-    const output = generatedOutputs[selectedCardId] || generateStrategyOutput(selectedCardId, preferences);
-    setStrategyOutput(output);
-  }, [generatedOutputs, preferences, selectedCardId]);
+    setStrategyOutput(generatedOutputs[selectedCardId] || null);
+  }, [generatedOutputs, selectedCardId]);
 
   // Handle CTA on left panel
   const handleGenerate = async (newPrefs: UserPreferences) => {
     setIsGenerating(true);
     setGenerationSteps('解析输入定位并提取实体...');
+    setPreferences(newPrefs);
+    setCards([]);
+    setGeneratedOutputs({});
+    setStrategyOutput(null);
+    setSelectedCardId('workspace');
+    setHasGeneratedYet(false);
     setActiveGraphCard(null);
 
     try {
@@ -88,37 +96,28 @@ export default function App() {
 
       setGenerationSteps('校验结构化 Brief / Prompt / Checklist...');
       const data = await response.json();
-      const nextCards = Array.isArray(data.cards) ? data.cards : generateRecommendations(newPrefs);
+      if (!Array.isArray(data.cards) || !data.outputsByCard) {
+        throw new Error('API returned invalid generation payload');
+      }
+
+      const nextCards = data.cards;
       const nextSelectedId = data.selectedCardId || nextCards[0]?.id || 'workspace';
-      const nextOutputs = data.outputsByCard || {};
+      const nextOutputs = data.outputsByCard;
 
       setPreferences(newPrefs);
       setCards(nextCards);
       setGeneratedOutputs(nextOutputs);
       setSelectedCardId(nextSelectedId);
-      setStrategyOutput(nextOutputs[nextSelectedId] || generateStrategyOutput(nextSelectedId, newPrefs));
+      setStrategyOutput(nextOutputs[nextSelectedId] || null);
       setHasGeneratedYet(true);
     } catch (error) {
       console.error(error);
-      setGenerationSteps('DeepSeek 暂不可用，启用本地兜底规则...');
-
-      const fallbackCards = generateRecommendations(newPrefs);
-      const fallbackSelectedId =
-        newPrefs.frequency === '一次性生成' || newPrefs.frequency === '偶尔使用工具'
-          ? 'taskflow'
-          : newPrefs.frequency === '长期学习训练'
-            ? 'dashboard'
-            : 'workspace';
-
+      setGenerationSteps('DeepSeek 暂不可用，请稍后重新生成...');
       setPreferences(newPrefs);
-      setCards(fallbackCards);
-      setGeneratedOutputs({
-        workspace: generateStrategyOutput('workspace', newPrefs),
-        taskflow: generateStrategyOutput('taskflow', newPrefs),
-        dashboard: generateStrategyOutput('dashboard', newPrefs),
-      });
-      setSelectedCardId(fallbackSelectedId);
-      setHasGeneratedYet(true);
+      setCards([]);
+      setGeneratedOutputs({});
+      setStrategyOutput(null);
+      setHasGeneratedYet(false);
     } finally {
       setIsGenerating(false);
     }
@@ -132,6 +131,9 @@ export default function App() {
       frequency: '偶尔使用工具',
       styleTone: '专业可信',
     });
+    setCards([]);
+    setGeneratedOutputs({});
+    setStrategyOutput(null);
     setHasGeneratedYet(false);
     setSelectedCardId('taskflow');
     setActiveGraphCard(null);
@@ -139,12 +141,12 @@ export default function App() {
 
   // Fast starter template loader
   const handleLoadTemplate = () => {
-    setPreferences(defaultPreferences);
-    setCards(generateRecommendations(defaultPreferences));
+    setPreferences(samplePreferences);
+    setCards(generateRecommendations(samplePreferences));
     setGeneratedOutputs({
-      workspace: generateStrategyOutput('workspace', defaultPreferences),
-      taskflow: generateStrategyOutput('taskflow', defaultPreferences),
-      dashboard: generateStrategyOutput('dashboard', defaultPreferences),
+      workspace: generateStrategyOutput('workspace', samplePreferences),
+      taskflow: generateStrategyOutput('taskflow', samplePreferences),
+      dashboard: generateStrategyOutput('dashboard', samplePreferences),
     });
     setSelectedCardId('workspace');
     setHasGeneratedYet(true);
@@ -256,7 +258,11 @@ export default function App() {
             
             {/* COLUMN 1: LEFT INPUT PANEL (4 cols) */}
             <section className="lg:col-span-4" aria-label="Preference configurations">
-              <PreferenceInput onGenerate={handleGenerate} isInitialEmpty={!hasGeneratedYet} />
+              <PreferenceInput
+                onGenerate={handleGenerate}
+                isInitialEmpty={!hasGeneratedYet}
+                preferences={preferences}
+              />
             </section>
 
             {/* COLUMN 2: MIDDLE STRATEGY RECOMMENDATIONS (4 cols) */}

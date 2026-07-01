@@ -50,6 +50,7 @@ Rules:
 - For graphNodes.type use only: concept, layout, component, state, rule, output.
 - For checklist.status use only: satisfied, supplementary, high_risk.
 - Make recommendations specific to the user's product, not generic.
+- Treat the user's demandText as the only source of truth. Never reuse example demands, previous outputs, or demo data unless the user explicitly asks for them.
 - Include practical UI states, error states, empty states, loading states, and anti-demo-quality guidance.
 - The selectedCardId should be the best match for the user's frequency and product complexity.
 - Ensure outputsByCard contains one StrategyOutput for every card id.
