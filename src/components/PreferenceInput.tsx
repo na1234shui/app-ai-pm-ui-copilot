@@ -8,10 +8,15 @@ interface PreferenceInputProps {
   preferences: UserPreferences;
 }
 
+const DEFAULT_USER_SEGMENTS = ['全部岗位', '数据分析师', '运营人员', '产品经理', '财务人员', '客服支持', '研发工程师'];
+
 export const PreferenceInput: React.FC<PreferenceInputProps> = ({ onGenerate, isInitialEmpty, preferences }) => {
   // Setup default state
   const [demandText, setDemandText] = useState(preferences.demandText);
   const [userSegment, setUserSegment] = useState(preferences.userSegment);
+  const [customUserSegment, setCustomUserSegment] = useState(
+    DEFAULT_USER_SEGMENTS.includes(preferences.userSegment) ? '' : preferences.userSegment
+  );
   const [frequency, setFrequency] = useState(preferences.frequency);
   const [styleTone, setStyleTone] = useState(preferences.styleTone);
 
@@ -23,13 +28,14 @@ export const PreferenceInput: React.FC<PreferenceInputProps> = ({ onGenerate, is
     selected: string;
   }>>([]);
 
-  const userSegments = ['全部岗位', '数据分析师', '运营人员', '产品经理', '财务人员', '客服支持', '研发工程师'];
+  const userSegments = DEFAULT_USER_SEGMENTS;
   const frequencies = ['高频工作台', '偶尔使用工具', '一次性生成', '长期学习训练'];
   const styleTones = ['专业可信', '简洁高效', '温暖易学', '科技智能', '活泼轻量'];
 
   useEffect(() => {
     setDemandText(preferences.demandText);
     setUserSegment(preferences.userSegment);
+    setCustomUserSegment(DEFAULT_USER_SEGMENTS.includes(preferences.userSegment) ? '' : preferences.userSegment);
     setFrequency(preferences.frequency);
     setStyleTone(preferences.styleTone);
   }, [preferences.demandText, preferences.frequency, preferences.styleTone, preferences.userSegment]);
@@ -143,9 +149,15 @@ export const PreferenceInput: React.FC<PreferenceInputProps> = ({ onGenerate, is
     setDynamicQuestions(prev => prev.map(q => q.id === qId ? { ...q, selected: value } : q));
   };
 
+  const handleCustomUserSegmentChange = (value: string) => {
+    setCustomUserSegment(value);
+    setUserSegment(value.trim());
+  };
+
   // Execute generation callback
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const resolvedUserSegment = userSegment.trim() || customUserSegment.trim() || '全部岗位';
     
     // Package dynamic options
     const dynamics: Record<string, string> = {};
@@ -155,7 +167,7 @@ export const PreferenceInput: React.FC<PreferenceInputProps> = ({ onGenerate, is
 
     onGenerate({
       demandText: demandText.trim(),
-      userSegment,
+      userSegment: resolvedUserSegment,
       frequency,
       styleTone,
       dynamicAnswers: dynamics
@@ -253,6 +265,26 @@ export const PreferenceInput: React.FC<PreferenceInputProps> = ({ onGenerate, is
                 </button>
               );
             })}
+            <div
+              className={`min-w-[10.5rem] flex-1 rounded-md border px-2.5 py-1.5 transition-all ${
+                customUserSegment.trim() && userSegment === customUserSegment.trim()
+                  ? 'bg-indigo-50 border-indigo-500 shadow-sm'
+                  : 'bg-slate-50 border-slate-200 focus-within:bg-white focus-within:border-indigo-400'
+              }`}
+            >
+              <input
+                type="text"
+                value={customUserSegment}
+                onChange={(e) => handleCustomUserSegmentChange(e.target.value)}
+                onFocus={() => {
+                  if (customUserSegment.trim()) {
+                    setUserSegment(customUserSegment.trim());
+                  }
+                }}
+                placeholder="自定义岗位/受众"
+                className="w-full bg-transparent text-[11px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none"
+              />
+            </div>
           </div>
         </div>
 

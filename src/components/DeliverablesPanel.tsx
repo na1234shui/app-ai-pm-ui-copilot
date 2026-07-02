@@ -604,7 +604,7 @@ ${editablePrompt}
           <div className="space-y-3 animate-fade-in">
             <div className="flex items-center justify-between">
               <p className="text-[11px] text-slate-500 leading-relaxed max-w-[70%]">
-                🚀 直接复制此结构化 Prompt 到大模型工具。<b>您可以在下方文本框中直接二次编辑和修改它：</b>
+                🚀 直接复制此超级 Prompt 到大模型工具。<b>它已按 PE 结构组织，可继续二次编辑：</b>
               </p>
               <div className="flex items-center gap-1.5">
                 {!editingSections.prompt ? (
@@ -651,14 +651,14 @@ ${editablePrompt}
                 </pre>
               )}
               <div className="absolute top-2 right-2 flex items-center gap-1 bg-slate-950/80 px-2 py-0.5 rounded text-[9px] text-slate-400 font-semibold select-none">
-                <span>VIBE PROMPT v2.1 {editingSections.prompt ? '(编辑中)' : ''}</span>
+                <span>SUPER PROMPT v3.0 {editingSections.prompt ? '(编辑中)' : ''}</span>
               </div>
             </div>
 
             <div className="bg-indigo-50 border border-indigo-100/70 p-3 rounded-lg flex items-start gap-2.5 text-[11px] text-indigo-800">
               <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
               <p className="leading-relaxed">
-                <b>专家提示：</b>此 Prompt 支持随您对 UI Brief 的个性化修改而进行任意形式的增删，复制并在 AI 工具中运行，能够将真实 SaaS 界面的实现度提升 2.5 倍以上。
+                <b>专家提示：</b>此 Prompt 已包含角色、上下文、目标、架构、状态、约束、输出格式和验收标准，更适合直接交给大模型生成高质量 UI 方案。
               </p>
             </div>
           </div>

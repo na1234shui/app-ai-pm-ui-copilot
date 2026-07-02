@@ -9,6 +9,31 @@ interface RecommendationCardComponentProps {
   onViewGraph: (card: RecommendationCard) => void;
 }
 
+const getCompactCardTitle = (card: RecommendationCard) => {
+  const normalized = card.title.replace(/\s+/g, '').trim();
+  if (normalized && normalized.length <= 20) {
+    return normalized;
+  }
+
+  if (card.id === 'workspace' || normalized.includes('工作台') || normalized.includes('三栏')) {
+    return '专业工作台方案';
+  }
+  if (card.id === 'taskflow' || normalized.includes('任务流') || normalized.includes('单页') || normalized.includes('轻量')) {
+    return '单页任务流方案';
+  }
+  if (card.id === 'dashboard' || normalized.includes('看板') || normalized.includes('运营') || normalized.includes('长期')) {
+    return '长期运营看板方案';
+  }
+  if (normalized.includes('数据') || normalized.includes('自动化')) {
+    return '数据自动化方案';
+  }
+  if (normalized.includes('问答') || normalized.includes('助手')) {
+    return '智能问答方案';
+  }
+
+  return normalized.slice(0, 18) || 'UI方案';
+};
+
 export const RecommendationCardComponent: React.FC<RecommendationCardComponentProps> = ({
   cards,
   selectedCardId,
@@ -19,6 +44,7 @@ export const RecommendationCardComponent: React.FC<RecommendationCardComponentPr
     <div className="space-y-4">
       {cards.map((card) => {
         const isSelected = selectedCardId === card.id;
+        const compactTitle = getCompactCardTitle(card);
 
         // Visual properties based on card tags
         const getTagColor = (tag: string) => {
@@ -53,8 +79,8 @@ export const RecommendationCardComponent: React.FC<RecommendationCardComponentPr
             {/* Title */}
             <div className="flex items-center gap-2 mb-2 w-[80%]">
               <LayoutGrid className={`w-4 h-4 shrink-0 ${isSelected ? 'text-indigo-600' : 'text-slate-400'}`} />
-              <h4 className="font-bold text-slate-800 text-sm md:text-base tracking-tight">
-                {card.title}
+              <h4 className="font-bold text-slate-800 text-sm md:text-base tracking-tight" title={card.title}>
+                {compactTitle}
               </h4>
             </div>
 

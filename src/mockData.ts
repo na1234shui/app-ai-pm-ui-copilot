@@ -1,5 +1,87 @@
 import { UserPreferences, RecommendationCard, StrategyOutput } from './types';
 
+function buildSuperPrompt(output: StrategyOutput, cardId: string, prefs: UserPreferences): string {
+  const demand = prefs.demandText || output.brief.productType || '新的 AI 产品想法';
+  const user = prefs.userSegment || output.brief.targetUser || '目标用户';
+  const tone = prefs.styleTone || '专业可信';
+  const freq = prefs.frequency || '未指定';
+  const schemeName = cardId === 'workspace'
+    ? '专业工作台方案'
+    : cardId === 'taskflow'
+      ? '单页任务流方案'
+      : '长期运营看板方案';
+
+  return `# 超级 Prompt：AI PM 级 UI 方案生成器
+
+## 1. 你的角色
+你是一名资深 AI 产品经理 + SaaS UI 架构师 + 前端体验评审专家。请把模糊需求转化为可真实开发、可交付、可上线的产品界面方案。不要写营销文案，不要做概念 Demo。
+
+## 2. 当前唯一输入
+- 产品需求：${demand}
+- 目标受众：${user}
+- 使用频率：${freq}
+- 视觉调性：${tone}
+- 推荐方案：${schemeName}
+
+## 3. 产品目标
+围绕当前需求设计一个真实可用的 Web 应用界面，让目标用户能完成核心任务。方案必须体现业务流程、页面结构、组件状态、异常处理和可操作路径。
+
+## 4. 信息架构与页面布局
+推荐布局：${output.brief.recommendedLayout}
+
+请输出完整页面结构，至少包含：
+1. 全局导航或上下文入口
+2. 核心任务输入区
+3. 主工作区或结果生成区
+4. 辅助诊断/引用/配置区
+5. 操作按钮区与反馈状态区
+
+## 5. 核心组件要求
+必须设计并描述这些组件：
+${output.brief.coreComponents.map((item, index) => `${index + 1}. ${item}`).join('\n')}
+
+## 6. 关键交互状态
+必须覆盖以下状态，不允许只画静态页面：
+${output.brief.necessaryStates.map((item, index) => `${index + 1}. ${item}`).join('\n')}
+
+同时补齐：空状态、加载状态、生成中状态、失败重试状态、低置信度追问状态、成功复制/导出状态。
+
+## 7. 视觉与体验约束
+- 风格必须符合「${tone}」，信息层级清晰，控件密度符合真实 SaaS 工具。
+- 使用克制的中性色、明确的主按钮、清晰边框、真实表格/表单/面板，而不是装饰性卡片堆砌。
+- 所有按钮、筛选、标签、输入框、开关、复制、重试、导出都必须有明确交互反馈。
+
+## 8. 严禁事项
+不要出现以下问题：
+${output.brief.notRecommended.map((item, index) => `${index + 1}. ${item}`).join('\n')}
+
+额外禁止：复用旧需求、使用占位假数据糊弄、只输出一句口号、把页面做成落地页、忽略错误状态。
+
+## 9. 输出格式
+请按以下结构输出：
+1. 产品定位一句话
+2. 页面信息架构
+3. 首屏布局说明
+4. 核心组件清单
+5. 关键状态与交互细节
+6. 视觉设计规范
+7. 前端实现要点
+8. 质量验收清单
+
+## 10. 验收标准
+- 读完后前端可以直接开始搭页面
+- 设计师可以据此画高保真
+- 产品经理可以拿它评审需求完整度
+- 页面必须像真实 SaaS 工具，而不是 AI 生成的演示模板`;
+}
+
+function withSuperPrompt(output: StrategyOutput, cardId: string, prefs: UserPreferences): StrategyOutput {
+  return {
+    ...output,
+    vibePrompt: buildSuperPrompt(output, cardId, prefs),
+  };
+}
+
 /**
  * Generates recommendation cards for the layout selection based on user input & preference keywords
  */
@@ -261,7 +343,7 @@ export function generateStrategyOutput(cardId: string, prefs: UserPreferences): 
     }
 
     if (cardId === 'workspace') {
-      return {
+      return withSuperPrompt({
         brief: {
           productType: '企业级全岗位数据自动化协作中台 (Enterprise All-in-One Data Platform)',
           targetUser: `面向：${user} (跨岗位多岗位业务提效协同)。解决公司级内耗困境。`,
@@ -329,9 +411,9 @@ export function generateStrategyOutput(cardId: string, prefs: UserPreferences): 
           { id: 'ck5', rule: '定时任务飞书/钉钉分发与安全限制', status: 'supplementary', description: '通过定时分发“绿灯”状态显示运行情况。提示研发注意避免从生产库拉取大范围时序数据，降低慢 SQL 风险。' },
           { id: 'ck6', rule: '零代码取数 API 生成易用度校验', status: 'satisfied', description: '分析师和研发可通过勾选维度一键发布取数 API，界面包含高频 API 时延与高并发波动图表。' }
         ]
-      };
+      }, cardId, prefs);
     } else if (cardId === 'taskflow') {
-      return {
+      return withSuperPrompt({
         brief: {
           productType: '轻量级多岗位数据自助服务工作流 (Self-Service Data Workspace)',
           targetUser: `面向想要极速合并 Excel、极低频操作、期望 30 秒能拿到标准报表的小白业务人员。`,
@@ -385,10 +467,10 @@ export function generateStrategyOutput(cardId: string, prefs: UserPreferences): 
           { id: 'ck3', rule: '脏数据在线修正与极速填充', status: 'satisfied', description: '抽屉中高亮 1% 脏数据缺失列，支持一键用平均值/上一行/0 填充。' },
           { id: 'ck4', rule: '飞书钉钉分发及成功正反馈', status: 'satisfied', description: '分发成功后有清爽的绿光气泡鼓励，强化小白用户的职能获得感。' }
         ]
-      };
+      }, cardId, prefs);
     } else {
       // dashboard
-      return {
+      return withSuperPrompt({
         brief: {
           productType: '企业指标元数据字典与自动化数据流调度中台 (Metrics Directory & Data Pipeline)',
           targetUser: `面向数据分析师与研发工程师。专攻指标口径不统一、重复导数内耗与慢 SQL 数据库崩溃问题。`,
@@ -443,7 +525,7 @@ export function generateStrategyOutput(cardId: string, prefs: UserPreferences): 
           { id: 'ck3', rule: '生产安全保障与慢 SQL 拦截检测', status: 'satisfied', description: '配置只读从库拉取，并在下方提供负载与时延波动曲线，防止一次性大容量取数拖垮生产服务器。' },
           { id: 'ck4', rule: '等宽日志控制台与错误代码追踪', status: 'satisfied', description: '终端流式日志对排查调度故障极具开发亲和力，支持一键重跑失败脚本。' }
         ]
-      };
+      }, cardId, prefs);
     }
   }
 
@@ -464,7 +546,7 @@ export function generateStrategyOutput(cardId: string, prefs: UserPreferences): 
       aestheticGuidelines = '低饱和主调搭配精细边框。';
   }
 
-  return {
+  return withSuperPrompt({
     brief: {
       productType: `${demand} (基于 AI PM 智能追问定制形态)`,
       targetUser: `面向${user}，匹配高频硬核的工作习惯`,
@@ -494,5 +576,5 @@ export function generateStrategyOutput(cardId: string, prefs: UserPreferences): 
     checklist: [
       { id: 'ck1', rule: '页面主任务与层级是否一目了然', status: 'satisfied', description: `界面采用工作台布局，用户一秒即可知晓从左选题目、中作答、右看 AI。` }
     ]
-  };
+  }, cardId, prefs);
 }
